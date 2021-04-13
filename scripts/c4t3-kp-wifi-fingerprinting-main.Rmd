@@ -17,4 +17,43 @@ Why not use GPS? While GPS works fairly reliably outdoors, it generally doesn't 
 
 We have been provided with a large database of wifi fingerprints from a multi-building industrial campus, each fingerprint is associated with a building, floor, and location ID.
 
-Your job is to evaluate multiple machine learning models to see which produces the best result, enabling us to make a recommendation to the client. If your recommended model is sufficiently accurate, it will be incorporated into a smartphone app for indoor locationin
+Your job is to evaluate multiple machine learning models to see which produces the best result, enabling us to make a recommendation to the client. 
+
+
+
+# Dataset ##############################################################
+
+From UCI Machine Learning Repository ([here](http://archive.ics.uci.edu/ml/datasets/UJIIndoorLoc)).
+
+> Automatic user localization consists of estimating the position of the user (latitude, longitude and altitude) by using an electronic device, usually a mobile phone. Outdoor localization problem can be solved very accurately thanks to the inclusion of GPS sensors into the mobile devices. However, indoor localization is still an open problem mainly due to the loss of GPS signal in indoor environments. Although, there are some indoor positioning technologies and methodologies, this database is focused on WLAN fingerprint-based ones (also know as WiFi Fingerprinting).
+
+### Characteristics
+
+- covers 3 buildings with 4 or more floors and almost 110.000m2
+- appropriate for classification (e.g. building & floor identification) or regression (e.g. longitude & latitude estimation). 
+- created in 2013 by more than 20 users and 25 Android devices. 
+- contains 19,937 training/reference records & 1,111 validation/test records and 529 attributes.
+- each WiFi fingerprint can be characterized by the *detected Wireless Access Points* (WAPs) and the corresponding *Received Signal Strength Intensity* (RSSI). 
+  + intensity values are represented as negative integer values ranging -104dBm (extremely poor signal) to 0dbM. 
+  + 100 is used to denote when a WAP was not detected.
+  + 520 different WAPs were detected. Thus, each WiFi fingerprint is composed by 520 intensity values.
+- the coordinates (latitude, longitude, floor) and Building ID are the attributes to be predicted.
+- type of space (e.g. office, lab) and relative position to the space (inside/outside) are included. Note: "outside" means that the capture was taken in front of the door to the space.
+- Information about the users, as well as how (android device & version) and when (timestamp) WiFi capture was taken is also included.
+
+
+
+
+
+## Load Pkgs & Data
+
+```{r}
+library(tidyverse)
+library(here)
+```
+
+
+```{r}
+wifi <- read.csv(here("data", "trainingData.csv"))
+```
+
