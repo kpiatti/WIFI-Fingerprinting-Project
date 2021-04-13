@@ -1,0 +1,20 @@
+---
+title: "WIFI Fingerprinting Project"
+author: "Katherine Piatti"
+date: "4/13/2021"
+output: html_document
+---
+
+# PROJECT SUMMARY ############################################
+
+The client needs a system to help people navigate complex, unfamiliar interior spaces without getting lost (e.g.industrial campuses, shopping malls, etc.). They would like us to investigate the feasibility of using "wifi fingerprinting". 
+
+>
+>
+Wifi fingerprinting uses the signals from multiple wifi hotspots within the buildinga to determine location, analogously to how GPS uses satellite signals.
+
+Why not use GPS? While GPS works fairly reliably outdoors, it generally doesn't work indoors.
+
+We have been provided with a large database of wifi fingerprints from a multi-building industrial campus, each fingerprint is associated with a building, floor, and location ID.
+
+Your job is to evaluate multiple machine learning models to see which produces the best result, enabling us to make a recommendation to the client. If your recommended model is sufficiently accurate, it will be incorporated into a smartphone app for indoor locationin
