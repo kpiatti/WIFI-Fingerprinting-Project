@@ -50,10 +50,99 @@ From UCI Machine Learning Repository ([here](http://archive.ics.uci.edu/ml/datas
 ```{r}
 library(tidyverse)
 library(here)
+library(skimr)
+library(broom)
+library(janitor)
+library(caret)
+
+library(devtools)
+ # installed pkg ggbiplot w/ install_github("vqv/ggbiplot") but when i loaded it there were conflicts with dplyr, so i unloaded it w/ detach("package:ggbiplot", unload=TRUE)
 ```
 
 
 ```{r}
+#read in dataset
 wifi <- read.csv(here("data", "trainingData.csv"))
+
+#convert to tibble
+as_tibble(wifi)
 ```
 
+# DATA WRANGLING ##########################################
+
+```{r}
+# standardize var names  
+wifi01 <- wifi %>%
+  clean_names()
+
+# remove unnecessary vars
+wifi02 <- wifi01 %>% 
+  select(-userid, -phoneid, -timestamp, -longitude, -latitude)
+
+# return names of last 10 vars  
+wifi02 %>%
+  names() %>% 
+  tail(10)
+```
+
+## Reduce WAP Variables
+There are 520 wifi access point (WAP) variables in the dataset. Using that many variables during modeling will be very computationally taxing and thus time consuming. So let's try to reduce the number of variables by selecting only the most important ones using principle component analysis (PCA). Which identifies the variables that have the most variance/ 
+
+```{r}
+# find and remove columns with zero variance
+wifi03 <- wifi02 %>% 
+  select(-(which(apply(wifi02, 2, var) == 0)))
+```
+That removed 55 WAP variables that had zero variance. Variables without variance are useless for modeling and cause problems for PCA analysis.
+
+```{r}
+# produce the PCA
+pca_fit <- wifi03 %>% 
+  select(wap001:wap519) %>% 
+  prcomp(center = TRUE, scale = TRUE)
+```
+
+```{r}
+# plot the data in PC coordinates
+pca_fit %>%
+  augment(wifi03) %>% # add original dataset back in
+  ggplot(aes(.fittedPC1, .fittedPC2, color = buildingid)) + 
+  geom_point(size = 1.5)
+
+```
+
+```{r}
+# extract rotation matrix
+pca_fit %>%
+  tidy(matrix = "rotation")
+```
+
+```{r}
+ggbiplot::ggbiplot(pca_fit,
+                   ellipse = TRUE,
+                   obs.scale = 1,
+                   var.scale = 4)
+```
+
+```{r}
+# create tibble of variance explained by each component
+pca_fit %>%
+  tidy(matrix = "eigenvalues")
+```
+
+
+## Wifi Fingerprint
+- vector of WAP1:WAP520
+- need to do dimensionality reduction: filter to single building or reasonable sampling
+
+
+
+## Create Unique Identifier for Each Location
+
+Think about how best to combine the building, floor, and specific location attributes into a single unique identifier for each instance. Also think about the appropriate type for this "composite" attribute: Should it be numeric, a factor, or something else? Convert the composite location attribute if appropriate.
+
+
+# MODELING ###########################################################
+
+
+# MODEL EVALUATION ####################################################
