@@ -176,18 +176,100 @@ PCA reveals that 321 components capture about 95% of the variance, and 258 compo
 ### Summary ###############################
 
 
-## Wifi Fingerprint
-- vector of WAP1:WAP520
-- need to do dimensionality reduction: filter to single building or reasonable sampling
+
+## Separate Data by Building  #################
+
+The full dataset is too large to use with classification models on my home computer. So I'll only work with data for 1 of 3 buildings. 
+```{r}
+#plot building counts
+qplot(wifi02$buildingid)
+```
+
+Buildings 0 and 1 have fewest number of observations, so modeling for one of them will be more tractable.
+
+```{r}
+#filter data for building 0
+b0_wifi02 <- wifi02 %>% 
+  filter(buildingid == 0)
+
+#filter data for building 1
+b1_wifi02 <- wifi02 %>% 
+  filter(buildingid == 1)
+
+#filtrt data for building 2
+b2_wifi02 <- wifi02 %>% 
+  filter(buildingid == 2)
+```
+
+For the purposes of this project I'm going to focus on building 1. 
 
 
 
-## Create Unique Identifier for Each Location
+### Zero Variance ############################
 
-Think about how best to combine the building, floor, and specific location attributes into a single unique identifier for each instance. Also think about the appropriate type for this "composite" attribute: Should it be numeric, a factor, or something else? Convert the composite location attribute if appropriate.
+```{r}
+# remove vars with zero variance from building 1 dataframe
+b1_wifi03 <- b1_wifi02 %>% 
+  select(-(which(apply(b1_wifi02, 2, var) == 0)))
+```
+Removed 259 variables with zero variance.
 
 
-# MODELING ###########################################################
+```{r}
+# remove vars with zero variance from building 0 dataframe
+b0_wifi03 <- b0_wifi02 %>% 
+  select(-(which(apply(b0_wifi02, 2, var) == 0)))
+```
+Removed 266 variables with zero variance. 
 
 
-# MODEL EVALUATION ####################################################
+```{r}
+# remove vars with zero variance from building 2 dataframe
+b2_wifi03 <- b2_wifi02 %>% 
+  select(-(which(apply(b2_wifi02, 2, var) == 0)))
+```
+Removed 263 variables with zero variance. 
+
+
+
+
+## Create Unique Location ID
+
+Because we are trying to predict the accuracy of wifi fingerprinting technology, we need to create a variable that uniquely identifies each location in the dataframe. There are 6 variables related to location in the dataframe:
+     
+     - floor
+     - buildingid
+     - spaceid
+     - relativeposition
+     - longitude
+     - lattitude
+
+I cannot use the longitude and lattitude variables because their values are continuous and I am using a classification model to assess the accuracy of the wifi fingerprinting system. 
+
+So I need to construct a location variable out of the floor, building, spaceid, and relative position variables. The first step is to use the dplyr unite funtion to combine them into one new variable called locationid.
+
+```{r}
+#unite 4 location vars into single locationid
+wifi03 <- wifi02 %>% 
+  unite(locationid, c(floor, buildingid, spaceid, relativeposition))
+```
+
+```{r}
+# check class of new var
+class(wifi03$locationid)
+```
+
+
+The next step is to coerce locationid from a character type to a factor type variable.
+```{r}
+wifi04 <- wifi03$locationid %>% 
+  as_factor()
+```
+
+
+
+
+# MODELING ##########################################
+
+
+# MODEL EVALUATION ########################## 
