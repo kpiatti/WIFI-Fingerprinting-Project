@@ -68,67 +68,112 @@ wifi <- read.csv(here("data", "trainingData.csv"))
 as_tibble(wifi)
 ```
 
+
+
+
+
+
 # DATA WRANGLING ##########################################
 
 ```{r}
 # standardize var names  
-wifi01 <- wifi %>%
+wifi <- wifi %>%
   clean_names()
 
 # remove unnecessary vars
-wifi02 <- wifi01 %>% 
+wifi01 <- wifi %>% 
   select(-userid, -phoneid, -timestamp, -longitude, -latitude)
 
 # return names of last 10 vars  
-wifi02 %>%
+wifi01 %>%
   names() %>% 
   tail(10)
 ```
 
-## Reduce WAP Variables
-There are 520 wifi access point (WAP) variables in the dataset. Using that many variables during modeling will be very computationally taxing and thus time consuming. So let's try to reduce the number of variables by selecting only the most important ones using principle component analysis (PCA). Which identifies the variables that have the most variance/ 
+
+
+
+## Reduce WAP Variables #####################
+
+There are 520 wifi access point (WAP) variables in the dataset. Using that many variables during modeling will be very computationally taxing and thus time consuming. 
+
+
+
+
+### Zero & Near Zero Variance ######################
 
 ```{r}
 # find and remove columns with zero variance
-wifi03 <- wifi02 %>% 
-  select(-(which(apply(wifi02, 2, var) == 0)))
+wifi02 <- wifi01 %>% 
+  select(-(which(apply(wifi01, 2, var) == 0)))
 ```
 That removed 55 WAP variables that had zero variance. Variables without variance are useless for modeling and cause problems for PCA analysis.
 
 ```{r}
-# produce the PCA
-pca_fit <- wifi03 %>% 
+# look for features with near zero variance
+wifi02 %>% 
   select(wap001:wap519) %>% 
-  prcomp(center = TRUE, scale = TRUE)
+  nearZeroVar(freqCut = 95/5,
+              uniqueCut = 95,
+              saveMetrics = TRUE,
+              foreach = TRUE,
+              allowParallel = TRUE) %>% 
+  arrange(desc(percentUnique))
+```
+
+There are 351 WAP variables with variance equal to or greater than 5%.
+
+```{r}
+
 ```
 
 ```{r}
-# plot the data in PC coordinates
-pca_fit %>%
-  augment(wifi03) %>% # add original dataset back in
-  ggplot(aes(.fittedPC1, .fittedPC2, color = buildingid)) + 
-  geom_point(size = 1.5)
-
+wifi02 %>% 
+  select_if(nearZeroVar(percentUnique), any(percentUnique >= 0.05))
 ```
 
+
+
+
+### Principle Component Analysis (PCA) ##################
+
+Let's try to reduce the number of variables by selecting only the most important ones using principle component analysis (PCA). Which identifies the variables that have the most variance/ 
+
+```{r}
+# produce the PCA
+pca_fit <- wifi02 %>% 
+  prcomp(center = TRUE, scale = TRUE)
+
+
+# plot the data in PC coordinates
+pca_fit %>%
+  augment(wifi02) %>% # add original dataset back in
+  ggplot(aes(.fittedPC1, .fittedPC2, color = buildingid)) + 
+  geom_point(size = 1.5)
+ ```
+
+
+#### Extract PCA Components ##################
+
+*Rotation Matrix*
 ```{r}
 # extract rotation matrix
 pca_fit %>%
   tidy(matrix = "rotation")
 ```
 
-```{r}
-ggbiplot::ggbiplot(pca_fit,
-                   ellipse = TRUE,
-                   obs.scale = 1,
-                   var.scale = 4)
-```
 
+*Explained Variance*
 ```{r}
 # create tibble of variance explained by each component
 pca_fit %>%
   tidy(matrix = "eigenvalues")
 ```
+PCA reveals that 321 components capture about 95% of the variance, and 258 components capture about 90% of the variance. 
+
+
+
+### Summary ###############################
 
 
 ## Wifi Fingerprint
