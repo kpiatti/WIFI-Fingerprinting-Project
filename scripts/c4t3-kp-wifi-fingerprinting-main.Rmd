@@ -382,12 +382,13 @@ registerDoParallel(pp)
 # specify resampling method: 5 fold cv, 2 repeats
 trcontrol <- trainControl(method = "repeatedcv", 
                           number = 5,
-                          repeats = 2,
+                          repeats = 1,
                           preProcOptions = c("center", "scale"))
 ```
 
 ## Train ################################################
 
+*C50*
 ```{r}
 c50_fit01 <- train(locatinid~.,
                    data = train_data,
@@ -396,6 +397,23 @@ c50_fit01 <- train(locatinid~.,
                    )
 ```
 
+>*Notes*
+>
+- First time running, threw a lazy-load error after 15 min. I think the problem might have to do with corrupt files in my renv file. 
+- It successfully ran after I purged the C50 package from my lockfile using `renv::purge`, re-installing the pkg, and THEN running the `train` code. 
+
+
+*Kknn*
+```{r}
+kknn_fit01 <- train(locatinid~.,
+                   data = train_data,
+                   method = "kknn",
+                   trControl = trcontrol
+                   )
+```
+
+
+*Random Forest*
 ```{r}
 rf_fit01 <- train(locatinid~.,
                    data = train_data,
@@ -404,7 +422,32 @@ rf_fit01 <- train(locatinid~.,
                    )
 ```
 
-## Random Forest Model ############################
+>*Notes*
+>
+- I tried 2 slightly different GBM models, neither of which completed running. 
+- I also tried a Naive Bayes model that quickly output an error message: There were missing values in resampled performance measures. Something is wrong; all the Accuracy metric values are missing:
+
+
+### Make Predictions ##############################
+
+```{r}
+# make location predictions on test data using rf model
+preds_rf01 <- predict(rf_fit01, test_data)
+
+#make location predictions on test data using c50 model
+preds_c5001 <- predict(c50_fit01, test_data)
+
+# make location prediction on test data using kknn model
+preds_kknn01 <- predict(kknn_fit01, test_data)
+```
+
+
+
+
+
+
+
+
 
 
 # MODEL EVALUATION ########################## 
