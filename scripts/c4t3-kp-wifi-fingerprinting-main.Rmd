@@ -5,41 +5,35 @@ date: "4/13/2021"
 output: html_document
 ---
 
-# PROJECT SUMMARY ############################################
+# *PROJECT SUMMARY* ######################################
 
 The client needs a system to help people navigate complex, unfamiliar interior spaces without getting lost (e.g.industrial campuses, shopping malls, etc.). They would like us to investigate the feasibility of using "wifi fingerprinting". 
 
->
->
-Wifi fingerprinting uses the signals from multiple wifi hotspots within the buildinga to determine location, analogously to how GPS uses satellite signals.
+>Wifi fingerprinting uses signals from multiple wifi hotspots within buildinga to determine location, analogously to how GPS uses satellite signals.
 
-Why not use GPS? While GPS works fairly reliably outdoors, it generally doesn't work indoors.
-
-We have been provided with a large database of wifi fingerprints from a multi-building industrial campus, each fingerprint is associated with a building, floor, and location ID.
 
 Your job is to evaluate multiple machine learning models to see which produces the best result, enabling us to make a recommendation to the client. 
 
 
 
-# Dataset ##############################################################
+# *THE DATA* #############################################
 
-From UCI Machine Learning Repository ([here](http://archive.ics.uci.edu/ml/datasets/UJIIndoorLoc)).
+For this project, we will use a large dataset from UCI Machine Learning Repository ([here](http://archive.ics.uci.edu/ml/datasets/UJIIndoorLoc)) containing signal readings from 520 sensors, along with location and user information.
 
-> Automatic user localization consists of estimating the position of the user (latitude, longitude and altitude) by using an electronic device, usually a mobile phone. Outdoor localization problem can be solved very accurately thanks to the inclusion of GPS sensors into the mobile devices. However, indoor localization is still an open problem mainly due to the loss of GPS signal in indoor environments. Although, there are some indoor positioning technologies and methodologies, this database is focused on WLAN fingerprint-based ones (also know as WiFi Fingerprinting).
 
-### Characteristics
+#### Details
 
-- covers 3 buildings with 4 or more floors and almost 110.000m2
-- appropriate for classification (e.g. building & floor identification) or regression (e.g. longitude & latitude estimation). 
-- created in 2013 by more than 20 users and 25 Android devices. 
-- contains 19,937 training/reference records & 1,111 validation/test records and 529 attributes.
-- each WiFi fingerprint can be characterized by the *detected Wireless Access Points* (WAPs) and the corresponding *Received Signal Strength Intensity* (RSSI). 
-  + intensity values are represented as negative integer values ranging -104dBm (extremely poor signal) to 0dbM. 
-  + 100 is used to denote when a WAP was not detected.
-  + 520 different WAPs were detected. Thus, each WiFi fingerprint is composed by 520 intensity values.
-- the coordinates (latitude, longitude, floor) and Building ID are the attributes to be predicted.
-- type of space (e.g. office, lab) and relative position to the space (inside/outside) are included. Note: "outside" means that the capture was taken in front of the door to the space.
-- Information about the users, as well as how (android device & version) and when (timestamp) WiFi capture was taken is also included.
+  - covers 3 buildings with 4 or more floors and almost 110.000m2
+  - appropriate for classification (e.g. building & floor identification) or regression (e.g. longitude & latitude estimation). 
+  - created in 2013 by more than 20 users and 25 Android devices. 
+  - contains 19,937 training/reference records & 1,111 validation/test records and 529 attributes.
+  - each WiFi fingerprint can be characterized by the *detected Wireless Access Points* (WAPs) and the corresponding *Received Signal Strength Intensity* (RSSI). 
+    + intensity values are represented as negative integer values ranging -104dBm (extremely poor signal) to 0dbM. 
+    + 100 is used to denote when a WAP was not detected.
+    + 520 different WAPs were detected. Thus, each WiFi fingerprint is composed by 520 intensity values.
+  - the coordinates (latitude, longitude, floor) and Building ID are the attributes to be predicted.
+  - type of space (e.g. office, lab) and relative position to the space (inside/outside) are included. Note: "outside" means that the capture was taken in front of the door to the space.
+  - Information about the users, as well as how (android device & version) and when (timestamp) WiFi capture was taken is also included.
 
 
 
@@ -54,9 +48,7 @@ library(skimr)
 library(broom)
 library(janitor)
 library(caret)
-
-library(devtools)
- # installed pkg ggbiplot w/ install_github("vqv/ggbiplot") but when i loaded it there were conflicts with dplyr, so i unloaded it w/ detach("package:ggbiplot", unload=TRUE)
+library(corrr)
 ```
 
 
@@ -73,42 +65,60 @@ as_tibble(wifi)
 
 
 
-# DATA WRANGLING ##########################################
+# *DATA WRANGLING* #######################################
+
+## Standardize Names & Remove Features #################
 
 ```{r}
 # standardize var names  
 wifi <- wifi %>%
   clean_names()
 
-# remove unnecessary vars
+# remove unneeded vars
 wifi01 <- wifi %>% 
   select(-userid, -phoneid, -timestamp, -longitude, -latitude)
+```
 
-# return names of last 10 vars  
-wifi01 %>%
-  names() %>% 
-  tail(10)
+
+## Transform Values ####################################
+
+According to the data documentation, RSSI readings are represented as negative numbers (-105 to 0), and when no signal was detected the value is 100. Lower dbm readings are associated with stronger signal strength (e.g. -70 represents a stronger signal that -105). Does it make sense to make sense to transform the values to positive and change the no signal detected values from 100 to 0? 
+
+I checked the WAP variables for 0 values, and did not find any. So changing no signal values to 0 would not conflict with existing readings. However, there may be other factors I am not considering. 
+
+The raw data contains negative RSSI 
+```{r}
+wifi01 %>% 
+  select(starts_with("wap")) %>% 
+  summarise(n() == 0)
 ```
 
 
 
 
-## Reduce WAP Variables #####################
+
+
+
+## Reduce WAP Variables ################################
 
 There are 520 wifi access point (WAP) variables in the dataset. Using that many variables during modeling will be very computationally taxing and thus time consuming. 
 
 
 
-
 ### Zero & Near Zero Variance ######################
 
+In machine learning we are trying to model or predict the values (regression) or classes (classification) of a target/dependent variable (DV) by looking at how values in a set of features/attributs/indepdent variables are related to different values/classes of the target variable. Therefore, Variables with zero or near zero variance (i.e. all values are the same or nearly the same) don't pprovide us with any information and can only get in the way, and should be removed.
+
+*Zero Variance*
 ```{r}
 # find and remove columns with zero variance
 wifi02 <- wifi01 %>% 
   select(-(which(apply(wifi01, 2, var) == 0)))
 ```
-That removed 55 WAP variables that had zero variance. Variables without variance are useless for modeling and cause problems for PCA analysis.
+That removed 55 WAP variables that had zero variance. 
 
+
+*Near Zero Variance*
 ```{r}
 # look for features with near zero variance
 wifi02 %>% 
@@ -118,18 +128,30 @@ wifi02 %>%
               saveMetrics = TRUE,
               foreach = TRUE,
               allowParallel = TRUE) %>% 
-  arrange(desc(percentUnique))
+  arrange(nzv)
 ```
 
-There are 351 WAP variables with variance equal to or greater than 5%.
+We can see from the ouput above that all the remaining WAP variables have near zero variance. So to reduce the feature space further, we need to employ another method.
+
+
+### Correlations ####################
+
+Variables that are highly correlated with each other contain the same information. Thus we can remove WAP vars that are highly correlated. 
 
 ```{r}
-
+# generate correlation matrix 
+wap_cors <- wifi02 %>% 
+  select(wap001:wap519) %>% 
+  correlate()
 ```
 
 ```{r}
-wifi02 %>% 
-  select_if(nearZeroVar(percentUnique), any(percentUnique >= 0.05))
+# create table of correlations over .85
+wap_cors %>%   
+  shave() %>%  #removes dup corrs by shaving up/low triangle of results
+  stretch() %>%   #reshapes df to long w/ 3 clmns (var1, var2, cor)
+  filter(r > abs(0.85)) %>% 
+  arrange(desc(r))
 ```
 
 
@@ -150,7 +172,7 @@ pca_fit %>%
   augment(wifi02) %>% # add original dataset back in
   ggplot(aes(.fittedPC1, .fittedPC2, color = buildingid)) + 
   geom_point(size = 1.5)
- ```
+```
 
 
 #### Extract PCA Components ##################
@@ -175,65 +197,15 @@ PCA reveals that 321 components capture about 95% of the variance, and 258 compo
 
 ### Summary ###############################
 
+PCA reduces the number of variables by 140, but I am not confident in my ability to interpret the results of a model using PCA components.
 
-
-## Separate Data by Building  #################
-
-The full dataset is too large to use with classification models on my home computer. So I'll only work with data for 1 of 3 buildings. 
-```{r}
-#plot building counts
-qplot(wifi02$buildingid)
-```
-
-Buildings 0 and 1 have fewest number of observations, so modeling for one of them will be more tractable.
-
-```{r}
-#filter data for building 0
-b0_wifi02 <- wifi02 %>% 
-  filter(buildingid == 0)
-
-#filter data for building 1
-b1_wifi02 <- wifi02 %>% 
-  filter(buildingid == 1)
-
-#filtrt data for building 2
-b2_wifi02 <- wifi02 %>% 
-  filter(buildingid == 2)
-```
-
-For the purposes of this project I'm going to focus on building 1. 
-
-
-
-### Zero Variance ############################
-
-```{r}
-# remove vars with zero variance from building 1 dataframe
-b1_wifi03 <- b1_wifi02 %>% 
-  select(-(which(apply(b1_wifi02, 2, var) == 0)))
-```
-Removed 259 variables with zero variance.
-
-
-```{r}
-# remove vars with zero variance from building 0 dataframe
-b0_wifi03 <- b0_wifi02 %>% 
-  select(-(which(apply(b0_wifi02, 2, var) == 0)))
-```
-Removed 266 variables with zero variance. 
-
-
-```{r}
-# remove vars with zero variance from building 2 dataframe
-b2_wifi03 <- b2_wifi02 %>% 
-  select(-(which(apply(b2_wifi02, 2, var) == 0)))
-```
-Removed 263 variables with zero variance. 
+I'm not sure whether it makes sense to reduce WAP variables by evaluating their correlation scores. In fact, it occurs to me that it might be a bad idea. When it comes to the RSSI readings at different WAPs, we have no reason to expect them to be independent. In fact, they should be related in the sense that we should expect readings on one WAP to be assiociated with readings on all the WAPs in proximity. 
 
 
 
 
-## Create Unique Location ID
+
+## Create Unique Location ID ###########################
 
 Because we are trying to predict the accuracy of wifi fingerprinting technology, we need to create a variable that uniquely identifies each location in the dataframe. There are 6 variables related to location in the dataframe:
      
@@ -244,17 +216,19 @@ Because we are trying to predict the accuracy of wifi fingerprinting technology,
      - longitude
      - lattitude
 
-I cannot use the longitude and lattitude variables because their values are continuous and I am using a classification model to assess the accuracy of the wifi fingerprinting system. 
-
-So I need to construct a location variable out of the floor, building, spaceid, and relative position variables. The first step is to use the dplyr unite funtion to combine them into one new variable called locationid.
+I cannot use the longitude and lattitude variables because their values are continuous and I am using a classification model to assess the accuracy of the wifi fingerprinting system. So I need to construct a location variable out of the floor, building, spaceid, and relative position variables. The first step is to use the dplyr unite funtion to combine them into one new variable called locationid.
 
 ```{r}
 #unite 4 location vars into single locationid
-wifi03 <- wifi02 %>% 
-  unite(locationid, c(floor, buildingid, spaceid, relativeposition))
+wifi03 <- wifi02 %>%
+  unite("locationid", c(buildingid, floor, spaceid, relativeposition),
+        remove = FALSE)
 ```
 
 ```{r}
+# check dimensions of wifi03
+dim(wifi03)
+
 # check class of new var
 class(wifi03$locationid)
 ```
@@ -262,14 +236,176 @@ class(wifi03$locationid)
 
 The next step is to coerce locationid from a character type to a factor type variable.
 ```{r}
-wifi04 <- wifi03$locationid %>% 
-  as_factor()
+# convert locationid to factor
+wifi04 <- wifi03 %>% 
+  mutate(locationid = as_factor(locationid))
+
+#verify change
+class(wifi04$locationid)
+```
+
+
+#### Inspect Factor ########################
+
+```{r}
+# get sample of values/levels/classes in locationid
+fct_unique(wifi04$locationid) %>% 
+  sample(10)
+```
+
+
+```{r}
+#get count of values within each level 
+fct_count(wifi04$locationid) %>% 
+  arrange(desc(n))
+```
+The locationid variable has 905 lebvels/classes, and each level/class contains anywhere between 90 and 2 observations.
+
+
+
+
+
+
+## Individul Building Dataframes #######################
+
+The full dataset is too large to use with classification models on my home computer. So I'll only work with data for 1 of 3 buildings. 
+```{r}
+#plot building counts
+qplot(wifi04$buildingid)
+```
+
+Buildings 0 and 1 have fewest number of observations, so modeling for one of them will be more tractable.
+
+
+
+### Create Dataframes ####################################
+
+```{r}
+#filter data for building 0
+b0<- wifi04 %>% 
+  group_by(buildingid) %>% 
+  filter(buildingid == 0) %>% 
+  ungroup()
+
+#filter data for building 1
+b1 <- wifi04 %>% 
+  filter(buildingid == 1)
+
+#filtrt data for building 2
+b2 <- wifi04 %>% 
+  filter(buildingid == 2)
 ```
 
 
 
 
-# MODELING ##########################################
+### Remove Variables ############################
+
+*Building 1*
+```{r}
+# remove original location vars and vars with zero variance
+b11 <- b1 %>% 
+  select(-(which(apply(b1, 2, var) == 0)), 
+         -c(floor, spaceid, relativeposition))
+```
+Removed 262 variables with zero variance.
+
+
+
+*Building 0*
+```{r}
+# remove original location vars and vars with zero variance
+b01 <- b0 %>% 
+  select(-c(floor, spaceid, relativeposition),
+         -(which(apply(b0, 2, var) == 0)))
+```
+Removed 269 variables with zero variance. 
+
+
+
+*Building 2*
+```{r}
+# remove original location vars and vars with zero variance
+b21 <- b2 %>% 
+  select(-(which(apply(b2, 2, var) == 0)),
+         -c(floor, spaceid, relativeposition))
+```
+Removed 266 variables with zero variance. 
+
+
+*Note*
+After running code to remove variables, R produced a message that "NAs introduced by coercion." However, I performed several searches for NA values and none were returned. 
+```{r}
+sum(is.na(b21))
+```
+
+
+
+
+
+# *MODELING* #############################################
+
+The goal is to build three models that predict users' locations-- represented by *locationid* (created by uniting values from building ID, floor, space ID, and relative position)--from their wifi fingerprint--represented by a set of signal readings from a wifi access points.
+
+compare their performance using kappa and accuracy performance metrics (can be generate from models confusion matrix)
+
+
+
+## Setup #########################################
+
+  ### Training & Testing Sets #####################
+
+```{r}
+set.seed(123)
+
+#create 70/30 partition
+dpartition <- createDataPartition(b01$locationid,
+                                 p = .70,
+                                 list = FALSE)
+# create training data
+train_data <- b01[dpartition,]
+
+# create testing data
+test_data <- b01[-dpartition,]
+```
+
+  ### Parallel Processing #####################
+
+```{r}
+library(doParallel)
+
+pp <- makeCluster(3)
+
+registerDoParallel(pp)
+
+# don't forget to stopCluster(pp) after running models
+```
+
+
+  ### Resampling & Tuning #################################
+
+```{r}
+# specify resampling method: 5 fold cv, 5 repeats
+trcontrol <- trainControl(method = "repeatedcv", 
+                          number = 5,
+                          repeats = 5)
+
+# specify manual tuning grid
+tune <- expand.grid(size = c(2, 7, 12),
+                    k = c(2, 3))
+```
+
+## Train ################################################
+
+```{r}
+gbm_fit01 <- train(locationid~.,
+                   data = train_data,
+                   method = "gbm",
+                   trControl = trcontrol)
+```
+
+
+## GBM Model ###########################################
 
 
 # MODEL EVALUATION ########################## 
