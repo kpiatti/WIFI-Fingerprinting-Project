@@ -221,8 +221,7 @@ I cannot use the longitude and lattitude variables because their values are cont
 ```{r}
 #unite 4 location vars into single locationid
 wifi03 <- wifi02 %>%
-  unite("locationid", c(buildingid, floor, spaceid, relativeposition),
-        remove = FALSE)
+  unite("locationid", c(buildingid, floor, spaceid, relativeposition))
 ```
 
 ```{r}
@@ -266,7 +265,7 @@ The locationid variable has 905 lebvels/classes, and each level/class contains a
 
 
 
-## Individul Building Dataframes #######################
+## Individual Building Dataframes #######################
 
 The full dataset is too large to use with classification models on my home computer. So I'll only work with data for 1 of 3 buildings. 
 ```{r}
@@ -282,31 +281,32 @@ Buildings 0 and 1 have fewest number of observations, so modeling for one of the
 
 ```{r}
 #filter data for building 0
-b0<- wifi04 %>% 
-  group_by(buildingid) %>% 
-  filter(buildingid == 0) %>% 
-  ungroup()
+b0<- wifi02 %>% 
+  filter(buildingid == 0)
 
 #filter data for building 1
-b1 <- wifi04 %>% 
+b1 <- wifi02 %>% 
   filter(buildingid == 1)
 
 #filtrt data for building 2
-b2 <- wifi04 %>% 
+b2 <- wifi02 %>% 
   filter(buildingid == 2)
 ```
 
 
 
 
-### Remove Variables ############################
+### Variable Transformation ############################
 
 *Building 1*
 ```{r}
 # remove original location vars and vars with zero variance
 b11 <- b1 %>% 
-  select(-(which(apply(b1, 2, var) == 0)), 
-         -c(floor, spaceid, relativeposition))
+  select(-(which(apply(b1, 2, var) == 0))) %>% 
+  unite("locatinid", c(floor, spaceid, relativeposition)) 
+
+b11 <- b11 %>%   
+  mutate(locatinid = as_factor(locatinid))
 ```
 Removed 262 variables with zero variance.
 
@@ -316,8 +316,9 @@ Removed 262 variables with zero variance.
 ```{r}
 # remove original location vars and vars with zero variance
 b01 <- b0 %>% 
-  select(-c(floor, spaceid, relativeposition),
-         -(which(apply(b0, 2, var) == 0)))
+  select(-(which(apply(b0, 2, var) == 0))) %>% 
+  unite("locationid", c(floor, spaceid, relativeposition)) %>% 
+  mutate(locationid = as_factor(locationid))
 ```
 Removed 269 variables with zero variance. 
 
@@ -327,23 +328,16 @@ Removed 269 variables with zero variance.
 ```{r}
 # remove original location vars and vars with zero variance
 b21 <- b2 %>% 
-  select(-(which(apply(b2, 2, var) == 0)),
-         -c(floor, spaceid, relativeposition))
+  select(-(which(apply(b2, 2, var) == 0))) %>%
+  unite("locationid", c(floor, spaceid, relativeposition)) %>% 
+  mutate(locationid = as_factor(locationid))
 ```
 Removed 266 variables with zero variance. 
 
 
-*Note*
-After running code to remove variables, R produced a message that "NAs introduced by coercion." However, I performed several searches for NA values and none were returned. 
-```{r}
-sum(is.na(b21))
-```
 
 
-
-
-
-# *MODELING* #############################################
+# *MODELING* ###########################################
 
 The goal is to build three models that predict users' locations-- represented by *locationid* (created by uniting values from building ID, floor, space ID, and relative position)--from their wifi fingerprint--represented by a set of signal readings from a wifi access points.
 
@@ -359,14 +353,14 @@ compare their performance using kappa and accuracy performance metrics (can be g
 set.seed(123)
 
 #create 70/30 partition
-dpartition <- createDataPartition(b01$locationid,
+dpartition <- createDataPartition(b11$locatinid,
                                  p = .70,
                                  list = FALSE)
 # create training data
-train_data <- b01[dpartition,]
+train_data <- b11[dpartition,]
 
 # create testing data
-test_data <- b01[-dpartition,]
+test_data <- b11[-dpartition,]
 ```
 
   ### Parallel Processing #####################
@@ -385,27 +379,32 @@ registerDoParallel(pp)
   ### Resampling & Tuning #################################
 
 ```{r}
-# specify resampling method: 5 fold cv, 5 repeats
+# specify resampling method: 5 fold cv, 2 repeats
 trcontrol <- trainControl(method = "repeatedcv", 
                           number = 5,
-                          repeats = 5)
-
-# specify manual tuning grid
-tune <- expand.grid(size = c(2, 7, 12),
-                    k = c(2, 3))
+                          repeats = 2,
+                          preProcOptions = c("center", "scale"))
 ```
 
 ## Train ################################################
 
 ```{r}
-gbm_fit01 <- train(locationid~.,
+c50_fit01 <- train(locatinid~.,
                    data = train_data,
-                   method = "gbm",
-                   trControl = trcontrol)
+                   method = "C5.0",
+                   trControl = trcontrol
+                   )
 ```
 
+```{r}
+rf_fit01 <- train(locatinid~.,
+                   data = train_data,
+                   method = "rf",
+                   trControl = trcontrol
+                   )
+```
 
-## GBM Model ###########################################
+## Random Forest Model ############################
 
 
 # MODEL EVALUATION ########################## 
