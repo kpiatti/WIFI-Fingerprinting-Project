@@ -444,10 +444,39 @@ preds_kknn01 <- predict(kknn_fit01, test_data)
 
 
 
-
-
-
-
-
-
 # MODEL EVALUATION ########################## 
+
+
+```{r}
+#get confusion matrix of rf model
+perform_rf01 <- confusionMatrix(preds_rf01, test_data$locatinid)
+
+tidy(perform_rf01, by_class = FALSE)
+```
+
+
+```{r}
+#get confusion matrix of c50 model
+perform_c5001 <- confusionMatrix(preds_c5001, test_data$locatinid)
+
+tidy(perform_c5001, by_class = FALSE)
+```
+
+```{r}
+#get confusion matrix of kknn model
+perform_kknn01 <- confusionMatrix(preds_kknn01, test_data$locatinid)
+
+perform_kknn01 %>% 
+  tidy(by_class = FALSE)
+```
+
+
+## Evaluation Summary ###########################
+
+
+
+
+
+
+
+
