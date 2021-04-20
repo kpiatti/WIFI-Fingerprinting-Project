@@ -452,6 +452,9 @@ preds_kknn01 <- predict(kknn_fit01, test_data)
 perform_rf01 <- confusionMatrix(preds_rf01, test_data$locatinid)
 
 tidy(perform_rf01, by_class = FALSE)
+
+perform_rf01 %>% 
+  tidy(by_class = FALSE)
 ```
 
 
@@ -472,6 +475,8 @@ perform_kknn01 %>%
 
 
 ## Evaluation Summary ###########################
+
+When compared to the no-information-rate of 0.17 (the accuracy you would get if you just predicted that all users were in the most frequent location in the dataset), all of the above models did pretty well. The random forest model outperformed the other two in terms of accuracy score. However, further digging into the performance metrics by location, may reveal additional information that speaks more heavily in favor of the other models. 
 
 
 
