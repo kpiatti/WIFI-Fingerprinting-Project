@@ -89,5 +89,13 @@ tb02 <- tb01 %>%
   mutate(locationid = as_factor(locationid))
 
 
+### MODEL EVALUALTION WITH BROOM ###########
+# I'm only comparing models by their kappa and accuracy scores for this project, but i figured out how to manipulate model performance output in more advanced ways using a combo of broom and other tidyverse functions, and i don't want to lose track of that 
 
-
+perform_kknn01 %>% 
+  tidy() %>% 
+  separate(class, into = c("floor", "space", "position")) %>% 
+  group_by(floor) %>% 
+  filter(term == "sensitivity") %>% 
+  arrange(desc(estimate))
+# adding the separate function allowed me to group by parts of the locationid for floor, space, and position. 
